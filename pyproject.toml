@@ -3,6 +3,7 @@ name = "datanodes"
 description = "Nodes for data processing pipelines"
 dynamic = ["version"]
 readme = "README.md"
+license = { text = "MIT" }
 authors = [
     { name = "Simon Pezold", email = "simon.pezold@unibas.ch" }
 ]
@@ -11,6 +12,9 @@ requires-python = ">=3.14"
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+license-files = ["LICENSE"]
 
 [tool.setuptools.dynamic]
 version = {attr = "datanodes.__version__"}
