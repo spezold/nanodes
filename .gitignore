@@ -1,0 +1,8 @@
+# Most essential (for us) entries from https://github.com/github/gitignore/blob/main/Python.gitignore
+
+*.egg-info
+__pycache__/
+*.py[codz]
+
+.idea/
+.vscode/
