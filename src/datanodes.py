@@ -35,7 +35,7 @@ def seed_from(generator: Random | None) -> int | None:
 
 class BaseNode[T]:
 
-    def __init__(self, source: BaseNode | None = None):
+    def __init__(self, source: "BaseNode | None" = None):
         self._source = source
         self._exhausted = False
 
