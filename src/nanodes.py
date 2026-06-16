@@ -137,7 +137,7 @@ class ParallelMapper[S, T](BaseNode):
             # Pre-fill with up to `num_workers` tasks
             futures = deque(executor.submit(self._fn, it) for it in islice(locked_source, self._num_workers))
             while futures:
-                # Yield the oldest result to preserve order (this will block without a timeout), then refill
+                # Yield result from oldest task to preserve order (this will block without a timeout), then refill
                 yield futures.popleft().result()
                 try:
                     futures.append(executor.submit(self._fn, next(locked_source)))
