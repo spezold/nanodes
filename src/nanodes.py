@@ -272,22 +272,17 @@ class Prefetcher[T](BaseNode):
         atexit.register(self._executor.shutdown)
 
     def iter(self) -> Iterator[T]:
-        executor = self._executor
-        iterator = iter(self._source)
+        source, sentinel = iter(self._source), object()
+        fetch_next = lambda: next(source, sentinel)
+        future_from_next = lambda: self._executor.submit(fetch_next)
+        futures = deque(future_from_next() for _ in range(self._prefetch_factor))  # Pre-fill the buffer
         exhausted = False
-        sentinel = object()
-
-        def fetch_next():
-            return next(iterator, sentinel)
-
-        queue = deque(executor.submit(fetch_next) for _ in range(self._prefetch_factor))  # Pre-fill the buffer
-
         while not exhausted:
-            item = queue.popleft().result()
+            item = futures.popleft().result()
             if item is sentinel:
                 exhausted = True
             else:
-                queue.append(executor.submit(fetch_next))  # Refill
+                futures.append(future_from_next())  # Refill
                 yield item
 
 
