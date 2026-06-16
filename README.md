@@ -31,9 +31,9 @@ The `Loader` class is technically not a node, but a node wrapper that provides a
 from nanodes import Batcher, RoundRobin, Loader, Wrapper, SerialMapper
 
 sources = [Wrapper(range(5)), Wrapper("abc"), Wrapper("ABCDEFG")]
-node = RoundRobin(sources, shuffle=True, seed=0xC0FFEE)               # round-robin with shuffling …
-node = Batcher(node, batch_size=4, drop_last=False)                   # … to batches of size 4 …
-node = SerialMapper(node, fn=lambda x: "".join(str(el) for el in x))  # … from lists to strings
+node = RoundRobin(sources, shuffle=True, seed=0xC0FFEE)               # shuffled round-robin
+node = Batcher(node, batch_size=4, drop_last=False)                   # … to lists of size 4
+node = SerialMapper(node, fn=lambda x: "".join(str(el) for el in x))  # … to strings
 loader = Loader(node)
 
 for epoch in range(3):
@@ -57,9 +57,9 @@ Using `set_epoch()` on the `Loader` lets us continue where we left off:
 from nanodes import Batcher, RoundRobin, Loader, Wrapper, SerialMapper
 
 sources = [Wrapper(range(5)), Wrapper("abc"), Wrapper("ABCDEFG")]
-node = RoundRobin(sources, shuffle=True, seed=0xC0FFEE)               # round-robin with shuffling …
-node = Batcher(node, batch_size=4, drop_last=False)                   # … to batches of size 4 …
-node = SerialMapper(node, fn=lambda x: "".join(str(el) for el in x))  # … from lists to strings
+node = RoundRobin(sources, shuffle=True, seed=0xC0FFEE)               # shuffled round-robin
+node = Batcher(node, batch_size=4, drop_last=False)                   # … to lists of size 4
+node = SerialMapper(node, fn=lambda x: "".join(str(el) for el in x))  # … to strings
 loader = Loader(node)
 
 loader.set_epoch(2)
