@@ -142,9 +142,9 @@ class ParallelMapper[S, T](BaseNode):
             except StopIteration:
                 exhausted = True
 
-    def iter[C: deque[Future] | set[Future]](self) -> Iterator[T]:
-        executor = self._executor
+    def iter[C: "deque[Future[T]] | set[Future[T]]"](self) -> Iterator[T]:
         locked_source = self._locked_source()
+        future_from: Callable[[S], Future[T]] = lambda el: self._executor.submit(self._fn, el)
         if self._in_order:
             cont_cls: type[C] = deque
             pop_next_from: Callable[[C], Future] = lambda cont: cont.popleft()
@@ -154,11 +154,11 @@ class ParallelMapper[S, T](BaseNode):
             pop_next_from: Callable[[C], Future] = lambda cont: _pop_next_completed_from(cont)
             append_to: Callable[[C, Future[T]], None] = lambda cont, el: cont.add(el)
         # Pre-fill with up to `num_workers` tasks
-        futures = cont_cls(executor.submit(self._fn, it) for it in islice(locked_source, self._num_workers))
+        futures = cont_cls(future_from(el) for el in islice(locked_source, self._num_workers))
         while futures:  # Yield next result (from oldest task if in-order, from next completed task otherwise), refill
             yield pop_next_from(futures).result()  # `result()` will block without timeout if necessary
             try:
-                append_to(futures, executor.submit(self._fn, next(locked_source)))
+                append_to(futures, future_from(next(locked_source)))
             except StopIteration:
                 pass  # Source exhausted → nothing more to submit
 
