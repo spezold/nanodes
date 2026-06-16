@@ -110,8 +110,7 @@ class ParallelMapper[S, T](BaseNode):
 
     def __init__(self, source: BaseNode[S], *, fn: Callable[[S], T], num_workers: int, in_order: bool):
         super().__init__(source)
-        if num_workers < 1:
-            raise ValueError(f"Need at least one worker (got num_workers={num_workers})")
+        _raise_if(num_workers < 1, msg=f"Need at least one worker (got num_workers={num_workers})")
         self._fn = fn
         self._num_workers = num_workers
         self._in_order = in_order
@@ -161,15 +160,13 @@ class ParallelMapper[S, T](BaseNode):
 def mapper[S, T](
     source: BaseNode[S], *, fn: Callable[[S], T], num_workers: int, in_order: bool | None = None
 ) -> SerialMapper[S, T] | ParallelMapper[S, T]:
-    if num_workers < 0:
-        raise ValueError(f"Need 0 or more workers (got num_workers={num_workers})")
+    _raise_if(num_workers < 0, msg=f"Need 0 or more workers (got num_workers={num_workers})")
     name = source.__class__.__name__
     if num_workers == 0:
         logger.debug(f"Create SerialMapper for {name}" + ("" if in_order is None else f" (ignore {in_order=})"))
         m = SerialMapper(source, fn=fn)
     else:
-        if in_order is None:
-            raise ValueError(f"Got {in_order=} for {num_workers=}: need boolean value if num_workers > 0")
+        _raise_if(in_order is None, msg=f"Got {in_order=} for {num_workers=}: need boolean value if num_workers > 0")
         logger.debug(f"Create ParallelMapper for {name}")
         m = ParallelMapper(source, fn=fn, num_workers=num_workers, in_order=in_order)
     return m
@@ -263,8 +260,7 @@ class Prefetcher[T](BaseNode):
 
     def __init__(self, source: BaseNode[T], *, prefetch_factor: int):
         super().__init__(source)
-        if prefetch_factor < 1:
-            raise ValueError(f"Need at least a prefetch factor of 1 (got {prefetch_factor=})")
+        _raise_if(prefetch_factor < 1, msg=f"Need at least a prefetch factor of 1 (got {prefetch_factor=})")
         self._prefetch_factor = prefetch_factor
         self._executor = ThreadPoolExecutor(max_workers=1)
         atexit.register(self._executor.shutdown)
