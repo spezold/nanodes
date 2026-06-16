@@ -22,10 +22,10 @@ def _raise_if(cond: bool, exception: type[BaseException] = ValueError, *, msg: s
         raise exception(msg)
 
 
-def _pop_next_completed_from(futures: set[Future]) -> Future:
+def _pop_next_completed_result_from[T](futures: set[Future[T]]) -> Future[T]:
     el = next(as_completed(futures))
     futures.remove(el)
-    return el
+    return el.result()
 
 
 @overload
@@ -147,16 +147,16 @@ class ParallelMapper[S, T](BaseNode):
         future_from: Callable[[S], Future[T]] = lambda el: self._executor.submit(self._fn, el)
         if self._in_order:
             cont_cls: type[C] = deque
-            pop_next_from: Callable[[C], Future] = lambda cont: cont.popleft()
+            pop_next_result_from: Callable[[C], T] = lambda cont: cont.popleft().result()
             append_to: Callable[[C, Future[T]], None] = lambda cont, el: cont.append(el)
         else:
             cont_cls: type[C] = set
-            pop_next_from: Callable[[C], Future] = lambda cont: _pop_next_completed_from(cont)
+            pop_next_result_from: Callable[[C], T] = lambda cont: _pop_next_completed_result_from(cont)
             append_to: Callable[[C, Future[T]], None] = lambda cont, el: cont.add(el)
         # Pre-fill with up to `num_workers` tasks
         futures = cont_cls(future_from(el) for el in islice(locked_source, self._num_workers))
         while futures:  # Yield next result (from oldest task if in-order, from next completed task otherwise), refill
-            yield pop_next_from(futures).result()  # `result()` will block without timeout if necessary
+            yield pop_next_result_from(futures)  # `result()` will block without timeout if necessary
             try:
                 append_to(futures, future_from(next(locked_source)))
             except StopIteration:
