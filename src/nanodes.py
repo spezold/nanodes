@@ -287,7 +287,7 @@ class Prefetcher[T](BaseNode):
             if item is sentinel:
                 exhausted = True
             else:
-                queue.append(self._executor.submit(fetch_next))  # Refill
+                queue.append(executor.submit(fetch_next))  # Refill
                 yield item
 
 
