@@ -26,9 +26,9 @@ def seed_from(generator: None) -> None: ...
 def seed_from(generator: Random | None) -> int | None:
     """
     Draw an integer from the given random number generator that, in turn, can be used as a seed for another random
-    number generator (convenience function).
-    :param generator: random number generator to draw from
-    :return: resulting integer in ``[0,2**64)``
+    number generator; do nothing of no generator is given (convenience function).
+    :param generator: optional random number generator to draw from
+    :return: resulting integer in ``[0,2**64)``; None, if no generator is given
     """
     return None if generator is None else generator.randrange(2**64)
 
@@ -147,8 +147,8 @@ class ParallelMapper[S, T](BaseNode):
             # Pre-fill with up to `num_workers` tasks
             futures = {executor.submit(self._fn, it) for it in islice(locked_source, self._num_workers)}
             while futures:
-                f = next(as_completed(futures))
                 # Yield the next completed result, then refill the now-empty spot
+                f = next(as_completed(futures))
                 futures.remove(f)
                 yield f.result()
                 try:
