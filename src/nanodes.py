@@ -145,6 +145,7 @@ class ParallelMapper[S, T](BaseNode):
     def iter[C: "deque[Future[T]] | set[Future[T]]"](self) -> Iterator[T]:
         locked_source = self._locked_source()
         future_from: Callable[[S], Future[T]] = lambda el: self._executor.submit(self._fn, el)
+
         if self._in_order:
             cont_cls: type[C] = deque
             pop_next_result_from: Callable[[C], T] = lambda cont: cont.popleft().result()
@@ -153,6 +154,7 @@ class ParallelMapper[S, T](BaseNode):
             cont_cls: type[C] = set
             pop_next_result_from: Callable[[C], T] = lambda cont: _pop_next_completed_result_from(cont)
             append_to: Callable[[C, Future[T]], None] = lambda cont, el: cont.add(el)
+
         # Pre-fill with up to `num_workers` tasks
         futures = cont_cls(future_from(el) for el in islice(locked_source, self._num_workers))
         while futures:  # Yield next result (from oldest task if in-order, from next completed task otherwise), refill
@@ -272,18 +274,13 @@ class Prefetcher[T](BaseNode):
         atexit.register(self._executor.shutdown)
 
     def iter(self) -> Iterator[T]:
-        source, sentinel = iter(self._source), object()
-        next_element_or_sentinel = lambda: next(source, sentinel)
-        future_from_next = lambda: self._executor.submit(next_element_or_sentinel)
+        source, exhausted_sentinel = iter(self._source), object()
+        future_from_next = lambda: self._executor.submit(next, source, exhausted_sentinel)
+
         futures = deque(future_from_next() for _ in range(self._prefetch_factor))  # Pre-fill the buffer
-        exhausted = False
-        while not exhausted:
-            item = futures.popleft().result()
-            if item is sentinel:
-                exhausted = True
-            else:
-                futures.append(future_from_next())  # Refill
-                yield item
+        while not (item := futures.popleft().result()) is exhausted_sentinel:
+            futures.append(future_from_next())  # Refill
+            yield item
 
 
 class Wrapper[T](BaseNode):
