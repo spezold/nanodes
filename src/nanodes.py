@@ -286,6 +286,7 @@ class Prefetcher[T](BaseNode):
 class Wrapper[T](BaseNode):
 
     def __init__(self, wrapped: Iterable[T], *, force_exhaustion: bool = False):
+        # TODO: Support `wrapped.set_epoch()` for exhaustion
         """
         A wrapper class for any iterable (subject to the assumptions below).
 
