@@ -5,8 +5,9 @@ A lightweight¹, dependency-free alternative to
 following the same compositing idea. Loading states is supported by means of `set_epoch()`, which enables reproducing
 the internal state of a data pipeline at the beginning of the given epoch.
 
-<sub>¹) nano ∪ nodes = nanodes²  
-²) No, I do not speak [Japanese](https://en.wiktionary.org/wiki/なのです).</sub>
+<sub>⁽¹⁾ nano ∪ nodes = nanodes²  
+⁽²⁾ No, I do not speak [Japanese](https://en.wiktionary.org/wiki/なのです).³  
+⁽³⁾ Yes, I like footnotes indeed.</sub>
 
 ## Provided nodes
 
