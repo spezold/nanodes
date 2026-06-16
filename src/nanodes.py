@@ -1,7 +1,7 @@
 import atexit
 from collections import deque
 from collections.abc import Iterator, Sequence, Iterable
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from itertools import islice
 from logging import getLogger, NullHandler
 from random import Random
@@ -14,9 +14,18 @@ logger = getLogger(__name__)
 logger.addHandler(NullHandler())
 
 
+# Some helper functions
+
+
 def _raise_if(cond: bool, exception: type[BaseException] = ValueError, *, msg: str):
     if cond:
         raise exception(msg)
+
+
+def _pop_next_completed_from(futures: set[Future]) -> Future:
+    el = next(as_completed(futures))
+    futures.remove(el)
+    return el
 
 
 @overload
@@ -31,6 +40,9 @@ def seed_from(generator: Random | None) -> int | None:
     :return: resulting integer in ``[0,2**64)``; None, if no generator is given
     """
     return None if generator is None else generator.randrange(2**64)
+
+
+# Actual node classes
 
 
 class BaseNode[T]:
@@ -130,31 +142,25 @@ class ParallelMapper[S, T](BaseNode):
             except StopIteration:
                 exhausted = True
 
-    def iter(self) -> Iterator[T]:
+    def iter[C: deque[Future] | set[Future]](self) -> Iterator[T]:
         executor = self._executor
         locked_source = self._locked_source()
         if self._in_order:
-            # Pre-fill with up to `num_workers` tasks
-            futures = deque(executor.submit(self._fn, it) for it in islice(locked_source, self._num_workers))
-            while futures:
-                # Yield result from oldest task to preserve order (this will block without a timeout), then refill
-                yield futures.popleft().result()
-                try:
-                    futures.append(executor.submit(self._fn, next(locked_source)))
-                except StopIteration:
-                    pass  # Source exhausted → nothing more to submit
+            cont_cls: type[C] = deque
+            pop_next_completed_from: Callable[[C], Future] = lambda cont: cont.popleft()
+            append_to: Callable[[C, T], None] = lambda cont, el: cont.append(el)
         else:
-            # Pre-fill with up to `num_workers` tasks
-            futures = {executor.submit(self._fn, it) for it in islice(locked_source, self._num_workers)}
-            while futures:
-                # Yield the next completed result, then refill the now-empty spot
-                f = next(as_completed(futures))
-                futures.remove(f)
-                yield f.result()
-                try:
-                    futures.add(executor.submit(self._fn, next(locked_source)))
-                except StopIteration:
-                    pass  # Source is exhausted → nothing more to submit
+            cont_cls: type[C] = set
+            pop_next_completed_from: Callable[[C], Future] = lambda cont: _pop_next_completed_from(cont)
+            append_to: Callable[[C, T], None] = lambda cont, el: cont.add(el)
+        # Pre-fill with up to `num_workers` tasks
+        futures = cont_cls(executor.submit(self._fn, it) for it in islice(locked_source, self._num_workers))
+        while futures:  # Yield next result (from oldest task if in-order, from next completed task otherwise), refill
+            yield pop_next_completed_from(futures).result()
+            try:
+                append_to(futures, executor.submit(self._fn, next(locked_source)))
+            except StopIteration:
+                pass  # Source exhausted → nothing more to submit
 
 
 def mapper[S, T](
