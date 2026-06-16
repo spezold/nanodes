@@ -148,11 +148,11 @@ class ParallelMapper[S, T](BaseNode):
         if self._in_order:
             cont_cls: type[C] = deque
             pop_next_from: Callable[[C], Future] = lambda cont: cont.popleft()
-            append_to: Callable[[C, T], None] = lambda cont, el: cont.append(el)
+            append_to: Callable[[C, Future[T]], None] = lambda cont, el: cont.append(el)
         else:
             cont_cls: type[C] = set
             pop_next_from: Callable[[C], Future] = lambda cont: _pop_next_completed_from(cont)
-            append_to: Callable[[C, T], None] = lambda cont, el: cont.add(el)
+            append_to: Callable[[C, Future[T]], None] = lambda cont, el: cont.add(el)
         # Pre-fill with up to `num_workers` tasks
         futures = cont_cls(executor.submit(self._fn, it) for it in islice(locked_source, self._num_workers))
         while futures:  # Yield next result (from oldest task if in-order, from next completed task otherwise), refill
