@@ -278,7 +278,7 @@ class Prefetcher[T](BaseNode):
         future_from_next = lambda: self._executor.submit(next, source, exhausted_sentinel)
 
         futures = deque(future_from_next() for _ in range(self._prefetch_factor))  # Pre-fill the buffer
-        while not (item := futures.popleft().result()) is exhausted_sentinel:
+        while (item := futures.popleft().result()) is not exhausted_sentinel:
             futures.append(future_from_next())  # Refill
             yield item
 
