@@ -1,5 +1,5 @@
 [project]
-name = "datanodes"
+name = "nanodes"
 description = "Nodes for data processing pipelines"
 dynamic = ["version"]
 readme = "README.md"
@@ -15,4 +15,4 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.dynamic]
-version = {attr = "datanodes.__version__"}
+version = {attr = "nanodes.__version__"}

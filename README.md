@@ -1,9 +1,11 @@
-# `datanodes` – A library for data processing pipelines
+# `nanodes` – A library for data processing pipelines
 
-A lightweight, dependency-free alternative to
+A lightweight¹, dependency-free alternative to
 [`torchdata.nodes`](https://meta-pytorch.org/data/main/torchdata.nodes.html),
 following the same compositing idea. Loading states is supported by means of `set_epoch()`, which enables reproducing
 the internal state of a data pipeline at the beginning of the given epoch.
+
+<sub>¹) nano ∪ nodes = nanodes</sub>
 
 ## Provided nodes
 
@@ -26,7 +28,7 @@ The `Loader` class is technically not a node, but a node wrapper that provides a
 ## Usage example
 
 ```python
-from datanodes import Batcher, RoundRobin, Loader, Wrapper, SerialMapper
+from nanodes import Batcher, RoundRobin, Loader, Wrapper, SerialMapper
 
 sources = [Wrapper(range(5)), Wrapper("abc"), Wrapper("ABCDEFG")]
 node = RoundRobin(sources, shuffle=True, seed=0xC0FFEE)               # round-robin with shuffling …
@@ -52,7 +54,7 @@ Epoch 2: ['a01b', '234c', 'ABCD', 'EFG']
 Using `set_epoch()` on the `Loader` lets us continue where we left off:
 
 ```python
-from datanodes import Batcher, RoundRobin, Loader, Wrapper, SerialMapper
+from nanodes import Batcher, RoundRobin, Loader, Wrapper, SerialMapper
 
 sources = [Wrapper(range(5)), Wrapper("abc"), Wrapper("ABCDEFG")]
 node = RoundRobin(sources, shuffle=True, seed=0xC0FFEE)               # round-robin with shuffling …
