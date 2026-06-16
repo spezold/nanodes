@@ -5,7 +5,7 @@ from time import sleep, time
 from threading import get_ident
 from unittest import TestCase
 
-from nanodes import BaseNode, Batcher, mapper, Loader, RoundRobin, Wrapper, seed_from
+from test_nanodes import BaseNode, Batcher, mapper, Loader, RoundRobin, Wrapper, seed_from
 
 
 class TestParallelMapperRuntime(TestCase):
