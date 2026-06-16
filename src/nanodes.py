@@ -156,7 +156,7 @@ class ParallelMapper[S, T](BaseNode):
         # Pre-fill with up to `num_workers` tasks
         futures = cont_cls(future_from(el) for el in islice(locked_source, self._num_workers))
         while futures:  # Yield next result (from oldest task if in-order, from next completed task otherwise), refill
-            yield pop_next_result_from(futures)  # `result()` will block without timeout if necessary
+            yield pop_next_result_from(futures)  # `Future.result()` will block without timeout if necessary
             try:
                 append_to(futures, future_from(next(locked_source)))
             except StopIteration:
