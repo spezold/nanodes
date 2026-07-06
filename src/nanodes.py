@@ -35,7 +35,7 @@ def seed_from(generator: None) -> None: ...
 def seed_from(generator: Random | None) -> int | None:
     """
     Draw an integer from the given random number generator that, in turn, can be used as a seed for another random
-    number generator; do nothing of no generator is given (convenience function).
+    number generator; do nothing if no generator is given (convenience function).
     :param generator: optional random number generator to draw from
     :return: resulting integer in ``[0,2**64)``; None, if no generator is given
     """
