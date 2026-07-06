@@ -129,7 +129,9 @@ class SerialMapper[S, T](BaseNode):
 
 class ParallelMapper[S, T](BaseNode):
 
-    def __init__(self, source: BaseNode[S], *, fn: Callable[[S], T], num_workers: int, in_order: bool):
+    def __init__[C: "deque[Future[T]] | set[Future[T]]"](
+        self, source: BaseNode[S], *, fn: Callable[[S], T], num_workers: int, in_order: bool
+    ):
         super().__init__(source)
         _raise_if(num_workers < 1, msg=f"Need at least one worker (got num_workers={num_workers})")
         self._fn = fn
@@ -139,6 +141,17 @@ class ParallelMapper[S, T](BaseNode):
         self._executor = ThreadPoolExecutor(max_workers=num_workers)
         self._lock = RLock()
         atexit.register(self._executor.shutdown)  # TODO: Really necessary? mapper+executor should live throughout run.
+
+        # Decide on container type and functions, depending on `self._in_order`
+        if self._in_order:
+            self._container_cls: type[C] = deque
+            self._pop_next_completed_result_from: Callable[[C], T] = lambda cont: cont.popleft().result()
+            self._append_to: Callable[[C, Future[T]], None] = lambda cont, el: cont.append(el)
+        else:
+            self._container_cls: type[C] = set
+            self._pop_next_completed_result_from = _pop_next_completed_result_from
+            self._append_to: Callable[[C, Future[T]], None] = lambda cont, el: cont.add(el)
+        self._future_from: Callable[[S], Future[T]] = lambda el: self._executor.submit(self._fn, el)
 
     def _locked_source(self) -> Iterator[S]:
         iterator = iter(self._source)
@@ -151,25 +164,15 @@ class ParallelMapper[S, T](BaseNode):
             except StopIteration:
                 exhausted = True
 
-    def iter[C: "deque[Future[T]] | set[Future[T]]"](self) -> Iterator[T]:
+    def iter(self) -> Iterator[T]:
         locked_source = self._locked_source()
-        future_from: Callable[[S], Future[T]] = lambda el: self._executor.submit(self._fn, el)
-
-        if self._in_order:
-            cont_cls: type[C] = deque
-            pop_next_result_from: Callable[[C], T] = lambda cont: cont.popleft().result()
-            append_to: Callable[[C, Future[T]], None] = lambda cont, el: cont.append(el)
-        else:
-            cont_cls: type[C] = set
-            pop_next_result_from: Callable[[C], T] = lambda cont: _pop_next_completed_result_from(cont)
-            append_to: Callable[[C, Future[T]], None] = lambda cont, el: cont.add(el)
 
         # Pre-fill with up to `num_workers` tasks
-        futures = cont_cls(future_from(el) for el in islice(locked_source, self._num_workers))
+        futures = self._container_cls(self._future_from(el) for el in islice(locked_source, self._num_workers))
         while futures:  # Yield next result (from oldest task if in-order, from next completed task otherwise), refill
-            yield pop_next_result_from(futures)  # `Future.result()` will block without timeout if necessary
+            yield self._pop_next_completed_result_from(futures)
             try:
-                append_to(futures, future_from(next(locked_source)))
+                self._append_to(futures, self._future_from(next(locked_source)))
             except StopIteration:
                 pass  # Source exhausted → nothing more to submit
 
