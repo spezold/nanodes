@@ -195,3 +195,32 @@ class TestWrapper(TestCase):
         for epoch_ in range(start_epoch_t2, num_epochs):
             samples_f = list(loader_f(regenerate=epoch_ != num_epochs - 1))
         self.assertListEqual(samples_t1_epoch_0, samples_f, f"Epoch {epoch_}: {samples_t1_epoch_0} != {samples_f}")
+
+
+class TestLength(TestCase):
+
+    def test_success(self):
+
+        sources = [Wrapper(range(5)), Wrapper(range(3))]  # -> total length: 8
+
+        # Simple
+        self.assertEqual(len(RoundRobin(sources)), 8)
+
+        # Accumulated, batched, divisible
+        l = Loader(Batcher(RoundRobin(sources, shuffle=False), batch_size=2, drop_last=True))
+        self.assertEqual(len(l), 4)
+        l = Loader(Batcher(RoundRobin(sources, shuffle=False), batch_size=2, drop_last=False))
+        self.assertEqual(len(l), 4)
+
+        # Accumulated, batched, *not* divisible
+        l = Loader(Batcher(RoundRobin(sources, shuffle=False), batch_size=3, drop_last=True))
+        self.assertEqual(len(l), 2)
+        l = Loader(Batcher(RoundRobin(sources, shuffle=False), batch_size=3, drop_last=False))
+        self.assertEqual(len(l), 3)
+
+    def test_failure(self):
+
+        with self.assertRaises(TypeError) as ctx:
+            len(Loader(Wrapper(iter(range(5)))))
+
+        self.assertIn("length of wrapped", str(ctx.exception))
