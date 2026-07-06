@@ -8,7 +8,7 @@ from random import Random
 from threading import RLock
 from typing import Callable, final, overload, Self
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 logger = getLogger(__name__)
 logger.addHandler(NullHandler())
@@ -63,6 +63,12 @@ class BaseNode[T]:
         yield from self.iter()
         self._exhausted = True
 
+    def __len__(self) -> int:
+        """
+        May be overridden by subclasses.
+        """
+        return len(self._source)
+
     def regenerate(self):
         """
         If overridden, must be called by all implementing nodes via ``super().regenerate()``
@@ -105,6 +111,9 @@ class Batcher(BaseNode):
                 batch = []
         if len(batch) and not self._drop_last:
             yield batch
+
+    def __len__(self) -> int:
+        return (l := len(self._source)) // self._batch_size + (0 if self._drop_last else (l % self._batch_size > 0))
 
 
 class SerialMapper[S, T](BaseNode):
@@ -240,6 +249,9 @@ class RoundRobin[T](BaseNode):
                 if iter_rng is not None:
                     rotate_iterators()  # `None` (ordered): pop() brought next to front; `not None`: enforce shuffle
 
+    def __len__(self) -> int:
+        return sum(len(source) for source in self._sources)
+
     def regenerate(self):
         # To be done by `super()`: (1) logging, (2) set `_exhausted` to False
         super().regenerate()
@@ -305,6 +317,12 @@ class Wrapper[T](BaseNode):
     def iter(self) -> Iterator[T]:
         yield from self._wrapped
 
+    def __len__(self) -> int:
+        try:
+            return len(self._wrapped)
+        except TypeError:
+            raise TypeError(f"Cannot determine length of wrapped {self._wrapped.__class__.__name__}")
+
     def set_epoch(self, epoch: int):
         super().set_epoch(epoch)
         if self._force_exhaustion:
@@ -323,6 +341,9 @@ class Loader[T]:
         yield from self._source
         if self._do_regenerate:
             self._source.regenerate()
+
+    def __len__(self) -> int:
+        return len(self._source)
 
     def __call__(self, *, regenerate: bool = True) -> Self:
         self._do_regenerate = regenerate
