@@ -201,7 +201,7 @@ class TestLength(TestCase):
 
     def test_success(self):
 
-        sources = [Wrapper(range(5)), Wrapper(range(3))]  # -> total length: 8
+        sources = [range(5), range(3)]  # -> total length: 8
 
         # Simple
         self.assertEqual(len(RoundRobin(sources)), 8)
@@ -221,6 +221,6 @@ class TestLength(TestCase):
     def test_failure(self):
 
         with self.assertRaises(TypeError) as ctx:
-            len(Loader(Wrapper(iter(range(5)))))
+            len(Loader(iter(range(5))))
 
         self.assertIn("length of wrapped", str(ctx.exception))
