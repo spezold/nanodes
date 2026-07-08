@@ -23,16 +23,17 @@ The following implementations are provided:
 - `Prefetcher`: Prefetches data from the input node in a separate thread, using a queue of given size.
 - `Wrapper`: A wrapper node that can be used to wrap any iterable data source, as long as it is finite and can be
   iterated multiple times. Other than subclassing `BaseNode`, this is the easiest way to create a source node for a
-  data pipeline.
+  data pipeline. Even easier, iterable data sources are automatically wrapped for convenience when initializing a node
+  or a loader. Nevertheless, to control exhaustion behavior, wrapper nodes can likewise be created explicitly.
 
 The `Loader` class is technically not a node, but a node wrapper that provides automatic resets after exhaustion.
 
 ## Usage example
 
 ```python
-from nanodes import Batcher, RoundRobin, Loader, Wrapper, SerialMapper
+from nanodes import Batcher, RoundRobin, Loader, SerialMapper
 
-sources = [Wrapper(range(5)), Wrapper("abc"), Wrapper("ABCDEFG")]
+sources = [range(5), "abc", "ABCDEFG"]
 node = RoundRobin(sources, shuffle=True, seed=0xC0FFEE)               # shuffled round-robin
 node = Batcher(node, batch_size=4, drop_last=False)                   # … to lists of size 4
 node = SerialMapper(node, fn=lambda x: "".join(str(el) for el in x))  # … to strings
@@ -56,9 +57,9 @@ Epoch 2: ['a01b', '234c', 'ABCD', 'EFG']
 Using `set_epoch()` on the `Loader` lets us continue where we left off:
 
 ```python
-from nanodes import Batcher, RoundRobin, Loader, Wrapper, SerialMapper
+from nanodes import Batcher, RoundRobin, Loader, SerialMapper
 
-sources = [Wrapper(range(5)), Wrapper("abc"), Wrapper("ABCDEFG")]
+sources = [range(5), "abc", "ABCDEFG"]
 node = RoundRobin(sources, shuffle=True, seed=0xC0FFEE)               # shuffled round-robin
 node = Batcher(node, batch_size=4, drop_last=False)                   # … to lists of size 4
 node = SerialMapper(node, fn=lambda x: "".join(str(el) for el in x))  # … to strings
