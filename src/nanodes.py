@@ -8,7 +8,7 @@ from random import Random
 from threading import RLock
 from typing import Callable, final, overload, Self
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 logger = getLogger(__name__)
 logger.addHandler(NullHandler())
@@ -26,6 +26,16 @@ def _pop_next_completed_result_from[T](futures: set[Future[T]]) -> Future[T]:
     el = next(as_completed(futures))
     futures.remove(el)
     return el.result()
+
+
+def _wrapped(node: "BaseNode | Iterable | None") -> "BaseNode | None":
+    if isinstance(node, BaseNode | None):
+        wrapped = node
+    elif isinstance(node, Iterable):
+        wrapped = Wrapper(node)
+    else:
+        raise ValueError(f"Cannot wrap {node.__class__.__name__}.")
+    return wrapped
 
 
 @overload
@@ -47,8 +57,8 @@ def seed_from(generator: Random | None) -> int | None:
 
 class BaseNode[T]:
 
-    def __init__(self, source: "BaseNode | None" = None):
-        self._source = source
+    def __init__(self, source: "BaseNode | Iterable | None" = None):
+        self._source = _wrapped(source)
         self._exhausted = False
 
     def iter(self) -> Iterator[T]:
@@ -67,7 +77,7 @@ class BaseNode[T]:
         """
         May be overridden by subclasses.
         """
-        return len(self._source)
+        return len(self._source)  # Fail on purpose if `source` does not support `len()`!
 
     def regenerate(self):
         """
@@ -97,7 +107,7 @@ class BaseNode[T]:
 
 class Batcher(BaseNode):
 
-    def __init__(self, source: BaseNode, *, batch_size: int, drop_last: bool):
+    def __init__(self, source: BaseNode | Iterable, *, batch_size: int, drop_last: bool):
         super().__init__(source)
         self._batch_size = batch_size
         self._drop_last = drop_last
@@ -118,7 +128,7 @@ class Batcher(BaseNode):
 
 class SerialMapper[S, T](BaseNode):
 
-    def __init__(self, source: BaseNode[S], *, fn: Callable[[S], T]):
+    def __init__(self, source: BaseNode[S] | Iterable[S], *, fn: Callable[[S], T]):
         super().__init__(source)
         self._fn = fn
 
@@ -130,7 +140,7 @@ class SerialMapper[S, T](BaseNode):
 class ParallelMapper[S, T](BaseNode):
 
     def __init__[C: "deque[Future[T]] | set[Future[T]]"](
-        self, source: BaseNode[S], *, fn: Callable[[S], T], num_workers: int, in_order: bool
+        self, source: BaseNode[S] | Iterable[S], *, fn: Callable[[S], T], num_workers: int, in_order: bool
     ):
         super().__init__(source)
         _raise_if(num_workers < 1, msg=f"Need at least one worker (got num_workers={num_workers})")
@@ -178,7 +188,7 @@ class ParallelMapper[S, T](BaseNode):
 
 
 def mapper[S, T](
-    source: BaseNode[S], *, fn: Callable[[S], T], num_workers: int, in_order: bool | None = None
+    source: BaseNode[S] | Iterable[S], *, fn: Callable[[S], T], num_workers: int, in_order: bool | None = None
 ) -> SerialMapper[S, T] | ParallelMapper[S, T]:
     _raise_if(num_workers < 0, msg=f"Need 0 or more workers (got num_workers={num_workers})")
     name = source.__class__.__name__
@@ -196,7 +206,7 @@ class RoundRobin[T](BaseNode):
 
     def __init__(
         self,
-        sources: Sequence[BaseNode[T]],
+        sources: Sequence[BaseNode[T] | Iterable[T]],
         *,
         pre_epoch_hook: Callable[[tuple[BaseNode[T], ...]], None] | None = None,
         shuffle: bool = False,
@@ -221,7 +231,7 @@ class RoundRobin[T](BaseNode):
         :param seed: random seed (optional; default: None)
         """
         super().__init__(source=None)  # We (need to) keep track of the sources ourselves
-        self._sources = tuple(sources)
+        self._sources = tuple(_wrapped(s) for s in sources)
 
         self._pre_epoch_hook = pre_epoch_hook
         self._instance_rng = (seed if isinstance(seed, Random) else Random(seed)) if shuffle else None
@@ -281,7 +291,7 @@ class Prefetcher[T](BaseNode):
     Fetch items from the source in a background thread, buffering up to ``prefetch_factor`` items ahead.
     """
 
-    def __init__(self, source: BaseNode[T], *, prefetch_factor: int):
+    def __init__(self, source: BaseNode[T] | Iterable[T], *, prefetch_factor: int):
         super().__init__(source)
         _raise_if(prefetch_factor < 1, msg=f"Need at least a prefetch factor of 1 (got {prefetch_factor=})")
         self._prefetch_factor = prefetch_factor
@@ -313,7 +323,7 @@ class Wrapper[T](BaseNode):
         wrapped iterable ``n`` times before the next pass (which, potentially, might take a while).
 
         """
-        super().__init__()
+        super().__init__(source=None)
         self._wrapped = wrapped
         self._force_exhaustion = force_exhaustion
 
@@ -336,8 +346,8 @@ class Wrapper[T](BaseNode):
 
 class Loader[T]:
 
-    def __init__(self, source: BaseNode[T]):
-        self._source = source
+    def __init__(self, source: BaseNode[T] | Iterable[T]):
+        self._source = _wrapped(source)
         self._do_regenerate = True  # Optionally suppress regeneration
 
     def __iter__(self) -> Iterator[T]:
