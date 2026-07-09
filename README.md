@@ -1,13 +1,16 @@
-# `nanodes` – A library for data processing pipelines
+# `nanodes` – A tiny library for data processing pipelines
 
-A lightweight¹, dependency-free alternative to
+The `nanodes`¹ ² ³ library is intended to be a lightweight, dependency-free alternative to
 [`torchdata.nodes`](https://meta-pytorch.org/data/main/torchdata.nodes.html),
-following the same compositing idea. Loading states is supported by means of `set_epoch()`, which enables reproducing
+following the same compositing idea.
+
+Loading states is supported by means of `set_epoch()`, which enables reproducing
 the internal state of a data pipeline at the beginning of the given epoch.
 
-<sub>⁽¹⁾ nano ∪ nodes = nanodes²  
-⁽²⁾ No, I do not speak [Japanese](https://en.wiktionary.org/wiki/なのです).³  
-⁽³⁾ Yes, I like footnotes indeed.</sub>
+<sub>¹ *nano* ∪ *nodes* = *nanodes*.  
+² Also see *nanodes* in [*J. A. Jobling (ed.): The Key to Scientific Names*](https://birdsoftheworld.org/bow/key-to-scientific-names/search?q=nanodes).  
+³ No, I do not speak [Japanese](https://en.wiktionary.org/wiki/なのです).⁴  
+⁴ Yes, I like footnotes indeed.</sub>
 
 ## Provided nodes
 
@@ -23,8 +26,8 @@ The following implementations are provided:
 - `Prefetcher`: Prefetches data from the input node in a separate thread, using a queue of given size.
 - `Wrapper`: A wrapper node that can be used to wrap any iterable data source, as long as it is finite and can be
   iterated multiple times. Other than subclassing `BaseNode`, this is the easiest way to create a source node for a
-  data pipeline. Even easier, iterable data sources are automatically wrapped for convenience when initializing a node
-  or a loader. Nevertheless, to control exhaustion behavior, wrapper nodes can likewise be created explicitly.
+  data pipeline. Even easier, iterable data sources are automatically wrapped for convenience when initializing any
+  node or a loader. Wrapper nodes can likewise be created explicitly however, e.g. to control exhaustion behavior.
 
 The `Loader` class is technically not a node, but a node wrapper that provides automatic resets after exhaustion.
 
