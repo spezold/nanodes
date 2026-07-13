@@ -105,6 +105,30 @@ class BaseNode[T]:
             self._source.set_epoch(epoch)
 
 
+class MultiBaseNode[T](BaseNode[T]):
+
+    def __init__(self, sources: Sequence[BaseNode[T] | Iterable[T]]):
+        super().__init__(source=None)  # We (need to) keep track of the sources ourselves
+        self._sources = tuple(_wrapped(s) for s in sources)
+
+    def __len__(self) -> int:
+        return sum(len(source) for source in self._sources)
+
+    def regenerate(self):
+        # To be done by `super()`: (1) logging, (2) set `_exhausted` to False
+        super().regenerate()
+        # To be done by us: actually regenerating the sources
+        for source in self._sources:
+            source.regenerate()
+
+    def set_epoch(self, epoch: int):
+        # To be done by `super()`: logging
+        super().set_epoch(epoch)
+        # To be done by us: set the epoch on the sources
+        for source in self._sources:
+            source.set_epoch(epoch)
+
+
 class Batcher(BaseNode):
 
     def __init__(self, source: BaseNode | Iterable, *, batch_size: int, drop_last: bool):
@@ -260,7 +284,7 @@ def mapper[S, T](
     return m
 
 
-class RoundRobin[T](BaseNode):
+class RoundRobin[T](MultiBaseNode):
 
     def __init__(
         self,
@@ -288,8 +312,7 @@ class RoundRobin[T](BaseNode):
         :param shuffle: shuffle traversal order (True) or maintain provided order (False; default)
         :param seed: random seed (optional; default: None)
         """
-        super().__init__(source=None)  # We (need to) keep track of the sources ourselves
-        self._sources = tuple(_wrapped(s) for s in sources)
+        super().__init__(sources=sources)
 
         self._pre_epoch_hook = pre_epoch_hook
         self._instance_rng = (seed if isinstance(seed, Random) else Random(seed)) if shuffle else None
@@ -320,28 +343,34 @@ class RoundRobin[T](BaseNode):
                 if iter_rng is not None:
                     rotate_iterators()  # `None` (ordered): pop() brought next to front; `not None`: enforce shuffle
 
-    def __len__(self) -> int:
-        return sum(len(source) for source in self._sources)
-
     def regenerate(self):
-        # To be done by `super()`: (1) logging, (2) set `_exhausted` to False
         super().regenerate()
-        # To be done by us: actually regenerating the sources and our own state
-        for source in self._sources:
-            source.regenerate()
+        # To be done by us: regenerating our own state
         self._next_iter_seed = seed_from(self._instance_rng)
 
     def set_epoch(self, epoch: int):
-        # To be done by `super()`: logging
         super().set_epoch(epoch)
-        # To be done by us: set the epoch on the sources, on the hook if necessary, and call the seed function an
+        # To be done by us: set the epoch on the hook if necessary, and call the seed function an
         # appropriate number of times to set our own state
-        for source in self._sources:
-            source.set_epoch(epoch)
         if self._pre_epoch_hook is not None and hasattr(self._pre_epoch_hook, "set_epoch"):
             self._pre_epoch_hook.set_epoch(epoch)
         for _ in range(epoch):
             self._next_iter_seed = seed_from(self._instance_rng)
+
+
+# class SortedMerger[T](MultiBaseNode):
+#
+#     def __init__(self, sources: Sequence[BaseNode[T] | Iterable[T]], *, key: Callable[[T], object] | None = None):
+#         """
+#         Yield elements across source nodes, in global sorting order.
+#
+#         CAUTION: Each source, in itself, is supposed to be sorted.
+#
+#         :param sources: nodes to traverse
+#         :param key: optional key function for sorting (default: None, i.e. sort by the elements themselves)
+#         """
+#         super().__init__(sources)
+#         self._key = key
 
 
 class Prefetcher[T](BaseNode):
