@@ -28,6 +28,8 @@ The following implementations are provided:
   In either case, output elements are yielded individually, one after another.
 - `RoundRobin`: Combines the data from multiple input nodes in a round-robin fashion, with or without shuffling the
   input nodes for each element.
+- `SortedMerger`: Merges the data from multiple input nodes in sorted order, according to a given sort key. The input
+  nodes are assumed to be internally sorted according to the same sort key.
 - `Prefetcher`: Prefetches data from the input node in a separate thread, using a queue of given size.
 - `Wrapper`: A wrapper node that can be used to wrap any iterable data source, as long as it is finite and can be
   iterated multiple times. Other than subclassing `BaseNode`, this is the easiest way to create a source node for a
@@ -65,9 +67,9 @@ Epoch 2: ['a01b', '234c', 'ABCD', 'EFG']
 Using `set_epoch()` on the `Loader` lets us continue where we left off:
 
 ```python
-from nanodes import Batcher, RoundRobin, Loader, SerialMapper
+from nanodes import Batcher, RoundRobin, Loader, SerialMapper, SortedMerger
 
-sources = [range(5), "abc", "ABCDEFG"]
+sources = [range(5), "abc", SortedMerger(["ABD", "CEFG"])]            # SortedMerger → "ABCDEFG" (as above)
 node = RoundRobin(sources, shuffle=True, seed=0xC0FFEE)               # shuffled round-robin
 node = Batcher(node, batch_size=4, drop_last=False)                   # … to lists of size 4
 node = SerialMapper(node, fn=lambda x: "".join(str(el) for el in x))  # … to strings
