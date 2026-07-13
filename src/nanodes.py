@@ -127,26 +127,73 @@ class Batcher(BaseNode):
 
 
 class SerialMapper[S, T](BaseNode):
-
-    def __init__(self, source: BaseNode[S] | Iterable[S], *, fn: Callable[[S], T]):
+    @overload
+    def __init__(self, source: BaseNode[S] | Iterable[S], *, fn: Callable[[S], Iterable[T]], one_to_n: int): ...
+    @overload
+    def __init__(self, source: BaseNode[S] | Iterable[S], *, fn: Callable[[S], T], one_to_n: None): ...
+    def __init__(
+        self,
+        source: BaseNode[S] | Iterable[S],
+        *,
+        fn: Callable[[S], T] | Callable[[S], Iterable[T]],
+        one_to_n: int | None = None,
+    ):
         super().__init__(source)
+        _raise_if(one_to_n is not None and one_to_n < 0, msg=f"Need output number >= 0 (got one_to_n={one_to_n})")
         self._fn = fn
+        self._is_one_to_n = one_to_n is not None
+        self._multiplier = 1 if one_to_n is None else one_to_n
 
     def iter(self) -> Iterator[T]:
         for item in self._source:
-            yield self._fn(item)
+            if self._is_one_to_n:
+                yield from self._fn(item)
+            else:
+                yield self._fn(item)
+
+    def __len__(self) -> int:
+        return len(self._source) * self._multiplier
 
 
 class ParallelMapper[S, T](BaseNode):
 
+    @overload
     def __init__[C: "deque[Future[T]] | set[Future[T]]"](
-        self, source: BaseNode[S] | Iterable[S], *, fn: Callable[[S], T], num_workers: int, in_order: bool
+        self,
+        source: BaseNode[S] | Iterable[S],
+        *,
+        fn: Callable[[S], Iterable[T]],
+        num_workers: int,
+        in_order: bool,
+        one_to_n: int,
+    ): ...
+    @overload
+    def __init__[C: "deque[Future[T]] | set[Future[T]]"](
+        self,
+        source: BaseNode[S] | Iterable[S],
+        *,
+        fn: Callable[[S], T],
+        num_workers: int,
+        in_order: bool,
+        one_to_n: None,
+    ): ...
+    def __init__[C: "deque[Future[T]] | set[Future[T]]"](
+        self,
+        source: BaseNode[S] | Iterable[S],
+        *,
+        fn: Callable[[S], T] | Callable[[S], Iterable[T]],
+        num_workers: int,
+        in_order: bool,
+        one_to_n: int | None = None,
     ):
         super().__init__(source)
         _raise_if(num_workers < 1, msg=f"Need at least one worker (got num_workers={num_workers})")
+        _raise_if(one_to_n is not None and one_to_n < 0, msg=f"Need output number >= 0 (got one_to_n={one_to_n})")
         self._fn = fn
         self._num_workers = num_workers
         self._in_order = in_order
+        self._is_one_to_n = one_to_n is not None
+        self._multiplier = 1 if one_to_n is None else one_to_n
 
         self._executor = ThreadPoolExecutor(max_workers=num_workers)
         self._lock = RLock()
@@ -180,25 +227,36 @@ class ParallelMapper[S, T](BaseNode):
         # Pre-fill with up to `num_workers` tasks
         futures = self._container_cls(self._future_from(el) for el in islice(locked_source, self._num_workers))
         while futures:  # Yield next result (from oldest task if in-order, from next completed task otherwise), refill
-            yield self._pop_next_completed_result_from(futures)
+            if self._is_one_to_n:
+                yield from self._pop_next_completed_result_from(futures)
+            else:
+                yield self._pop_next_completed_result_from(futures)
             try:
                 self._append_to(futures, self._future_from(next(locked_source)))
             except StopIteration:
                 pass  # Source exhausted → nothing more to submit
 
+    def __len__(self) -> int:
+        return len(self._source) * self._multiplier
+
 
 def mapper[S, T](
-    source: BaseNode[S] | Iterable[S], *, fn: Callable[[S], T], num_workers: int, in_order: bool | None = None
+    source: BaseNode[S] | Iterable[S],
+    *,
+    fn: Callable[[S], T] | Callable[[S], Iterable[T]],
+    num_workers: int,
+    in_order: bool | None = None,
+    one_to_n: int | None = None,
 ) -> SerialMapper[S, T] | ParallelMapper[S, T]:
     _raise_if(num_workers < 0, msg=f"Need 0 or more workers (got num_workers={num_workers})")
     name = source.__class__.__name__
     if num_workers == 0:
         logger.debug(f"Create SerialMapper for {name}" + ("" if in_order is None else f" (ignore {in_order=})"))
-        m = SerialMapper(source, fn=fn)
+        m = SerialMapper(source, fn=fn, one_to_n=one_to_n)
     else:
         _raise_if(in_order is None, msg=f"Got {in_order=} for {num_workers=}: need boolean value if num_workers > 0")
         logger.debug(f"Create ParallelMapper for {name}")
-        m = ParallelMapper(source, fn=fn, num_workers=num_workers, in_order=in_order)
+        m = ParallelMapper(source, fn=fn, num_workers=num_workers, in_order=in_order, one_to_n=one_to_n)
     return m
 
 
