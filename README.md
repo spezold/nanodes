@@ -20,7 +20,12 @@ The following implementations are provided:
 - `Batcher`: Batches the input node's data into lists of a given size.
 - `SerialMapper` and `ParallelMapper`: Applies a given function to the input node's data, either serially or in
   parallel, using multithreading in the latter case. The `mapper()` factory can be used to create a `SerialMapper` or
-  `ParallelMapper` instance based on the given `num_workers` parameter.
+  `ParallelMapper` instance based on the given `num_workers` parameter. Mapping functions may be *1:1* or *1:n*:
+
+  - If *1:1*, the mapping function is supposed to produce one input element per output element
+  - If *1:n*, the mapping function is supposed to produce an iterable of *n* output elements per input element.
+
+  In either case, output elements are yielded individually, one after another.
 - `RoundRobin`: Combines the data from multiple input nodes in a round-robin fashion, with or without shuffling the
   input nodes for each element.
 - `Prefetcher`: Prefetches data from the input node in a separate thread, using a queue of given size.

@@ -8,7 +8,7 @@ from random import Random
 from threading import RLock
 from typing import Callable, final, overload, Self
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 logger = getLogger(__name__)
 logger.addHandler(NullHandler())
