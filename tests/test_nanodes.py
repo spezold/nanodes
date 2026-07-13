@@ -5,7 +5,7 @@ from time import sleep, time
 from threading import get_ident
 from unittest import TestCase
 
-from nanodes import BaseNode, Batcher, mapper, Loader, RoundRobin, Wrapper, seed_from
+from nanodes import BaseNode, Batcher, mapper, Loader, RoundRobin, Wrapper, seed_from, SerialMapper, ParallelMapper
 
 
 class TestParallelMapperRuntime(TestCase):
@@ -195,6 +195,19 @@ class TestWrapper(TestCase):
         for epoch_ in range(start_epoch_t2, num_epochs):
             samples_f = list(loader_f(regenerate=epoch_ != num_epochs - 1))
         self.assertListEqual(samples_t1_epoch_0, samples_f, f"Epoch {epoch_}: {samples_t1_epoch_0} != {samples_f}")
+
+
+class TestMapperOneToN(TestCase):
+
+    def test(self):
+
+        n = 3
+        # SerialMapper
+        for type_, num, io in zip([SerialMapper, ParallelMapper], [0, 1], [None, False]):
+            m = mapper(range(n), fn=lambda i: [i, i**2], num_workers=num, one_to_n=2, in_order=io)
+            self.assertIsInstance(m, type_)
+            self.assertEqual(len(m), 2 * n)
+            self.assertEqual(list(m), [x for pair in zip(range(n), (i**2 for i in range(n))) for x in pair])
 
 
 class TestLength(TestCase):
