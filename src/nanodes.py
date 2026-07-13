@@ -2,7 +2,8 @@ import atexit
 from collections import deque
 from collections.abc import Iterator, Sequence, Iterable
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
-from itertools import islice
+from heapq import heappop, heappush
+from itertools import count, islice
 from logging import getLogger, NullHandler
 from random import Random
 from threading import RLock
@@ -358,19 +359,42 @@ class RoundRobin[T](MultiBaseNode):
             self._next_iter_seed = seed_from(self._instance_rng)
 
 
-# class SortedMerger[T](MultiBaseNode):
-#
-#     def __init__(self, sources: Sequence[BaseNode[T] | Iterable[T]], *, key: Callable[[T], object] | None = None):
-#         """
-#         Yield elements across source nodes, in global sorting order.
-#
-#         CAUTION: Each source, in itself, is supposed to be sorted.
-#
-#         :param sources: nodes to traverse
-#         :param key: optional key function for sorting (default: None, i.e. sort by the elements themselves)
-#         """
-#         super().__init__(sources)
-#         self._key = key
+class SortedMerger[T](MultiBaseNode):
+
+    def __init__(self, sources: Sequence[BaseNode[T] | Iterable[T]], *, key: Callable[[T], object] | None = None):
+        """
+        Yield elements across source nodes, in global sorting order.
+
+        CAUTION: Each source, in itself, is supposed to be sorted.
+
+        :param sources: nodes to traverse
+        :param key: optional key function for sorting (default: None, i.e. sort by the elements themselves)
+        """
+        super().__init__(sources)
+        self._key = key
+
+    def iter(self) -> Iterator[T]:
+        key = (lambda x: x) if self._key is None else self._key
+        heap = []
+        tiebreaker = count()  # Unique counter to avoid comparing items themselves when keys tie
+
+        def push_next_item_or_pass(heap_, it_, tiebreaker_):
+            try:
+                next_item = next(it_)
+            except StopIteration:
+                pass
+            else:  # On the heap, store : next item's sort key, tiebreaker, next item, next item's iterator
+                heappush(heap_, (key(next_item), next(tiebreaker_), next_item, it_))
+
+        # Init heap with 1st item from each iterable
+        for it in (iter(s) for s in self._sources):
+            push_next_item_or_pass(heap, it, tiebreaker)
+
+        # Pop the smallest item's tuple, yield item alone, then push the next item from that item's iterator
+        while heap:
+            _, _, item, it = heappop(heap)
+            yield item
+            push_next_item_or_pass(heap, it, tiebreaker)
 
 
 class Prefetcher[T](BaseNode):
