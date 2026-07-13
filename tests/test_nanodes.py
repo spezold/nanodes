@@ -5,7 +5,18 @@ from time import sleep, time
 from threading import get_ident
 from unittest import TestCase
 
-from nanodes import BaseNode, Batcher, mapper, Loader, RoundRobin, Wrapper, seed_from, SerialMapper, ParallelMapper
+from nanodes import (
+    BaseNode,
+    Batcher,
+    mapper,
+    Loader,
+    RoundRobin,
+    Wrapper,
+    seed_from,
+    SerialMapper,
+    ParallelMapper,
+    SortedMerger,
+)
 
 
 class TestParallelMapperRuntime(TestCase):
@@ -208,6 +219,14 @@ class TestMapperOneToN(TestCase):
             self.assertIsInstance(m, type_)
             self.assertEqual(len(m), 2 * n)
             self.assertEqual(list(m), [x for pair in zip(range(n), (i**2 for i in range(n))) for x in pair])
+
+
+class TestSortedMerger(TestCase):
+
+    def test(self):
+
+        m = SortedMerger(["abe", "ACDEF"], key=str.lower)  # Use `lower` to have tiebreaker take effect
+        self.assertEqual("".join(m), "aAbCDeEF")
 
 
 class TestLength(TestCase):
